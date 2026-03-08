@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+import sys
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, render_template
 from dotenv import load_dotenv
@@ -450,9 +451,6 @@ def main():
         logger.error("Failed to initialize bot. Check your configuration.")
         return
     
-    # Start Telegram command handlers
-    start_telegram_bot()
-    
     # Send startup message
     startup_message = """🚀 <b>Bot Started Successfully!</b>
 
@@ -472,15 +470,22 @@ def main():
     
     send_telegram_message(startup_message)
     
-    # Start background monitor
+    # Start background monitor for OTP checking
     monitor_thread = threading.Thread(target=background_monitor, daemon=True)
     monitor_thread.start()
     
-    # Get port for deployment
+    # Start Flask server in background
     port = int(os.environ.get('PORT', 5000))
+    flask_thread = threading.Thread(
+        target=lambda: app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False),
+        daemon=True
+    )
+    flask_thread.start()
+    logger.info(f"Flask server started on port {port} in background")
     
-    logger.info(f"Starting Flask server on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # IMPORTANT - Telegram bot MAIN thread mein chalega
+    logger.info("Starting Telegram bot polling in main thread...")
+    telegram_app.run_polling()
 
 if __name__ == '__main__':
     main()
